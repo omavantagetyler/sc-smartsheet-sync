@@ -65,7 +65,7 @@ def main():
         filename = "service_channel_orders.csv"
         
         # Attachment logic
-        ss_client.Sheets.attach_file_to_sheet(
+        ss_client.Attachments.attach_file_to_sheet(
             SS_SHEET_ID, 
             (filename, csv_content, 'text/csv')
         )
