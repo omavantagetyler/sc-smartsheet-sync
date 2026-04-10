@@ -24,7 +24,7 @@ def main():
         existing_attachment = next((a for a in attachments_result.data if a.name == filename), None)
 
         # 5. Execute versioned or fresh upload
-        file_tuple = (filename, csv_content, 'text/csv')
+        file_tuple = (filename, csv_content.encode('utf-8'), 'text/csv')
 
         if existing_attachment:
             # Update the existing file
