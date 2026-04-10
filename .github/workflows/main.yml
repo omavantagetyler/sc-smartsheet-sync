@@ -2,9 +2,8 @@ name: Sync ServiceChannel to Smartsheet
 
 on:
   schedule:
-    # This runs every 15 minutes
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Allows you to run it manually for testing
+    - cron: '* * * * *'
+  workflow_dispatch:
 
 jobs:
   build:
