@@ -1,48 +1,74 @@
+import os
+import requests
+import pandas as pd
+import smartsheet
+from io import StringIO
+
+# 1. Configuration - Pulling from GitHub Secrets
+SC_CLIENT_ID = os.getenv('SC_CLIENT_ID')
+SC_CLIENT_SECRET = os.getenv('SC_CLIENT_SECRET')
+SC_USERNAME = os.getenv('SC_USERNAME')
+SC_PASSWORD = os.getenv('SC_PASSWORD')
+
+SS_TOKEN = os.getenv('SS_TOKEN')
+SS_SHEET_ID = os.getenv('SS_SHEET_ID')
+
+def get_servicechannel_token():
+    auth_url = "https://login.servicechannel.com/oauth/token"
+    data = {
+        'grant_type': 'password',
+        'username': SC_USERNAME,
+        'password': SC_PASSWORD,
+        'client_id': SC_CLIENT_ID,
+        'client_secret': SC_CLIENT_SECRET
+    }
+    response = requests.post(auth_url, data=data)
+    response.raise_for_status()
+    return response.json().get('access_token')
+
+def get_work_orders(token):
+    # OData endpoint to get Work Orders
+    # We select common fields; adjust the $select string if you need more columns
+    url = "https://api.servicechannel.com/v3/odata/workorders?$select=Id,Number,Status,Priority,Trade,Location,CallDate"
+    headers = {'Authorization': f'Bearer {token}'}
+    
+    all_orders = []
+    while url:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        all_orders.extend(data.get('value', []))
+        # Handle ServiceChannel pagination
+        url = data.get('@odata.nextLink')
+    
+    return all_orders
+
 def main():
     try:
-        # 1. Authenticate and Fetch from ServiceChannel
+        # Authenticate and Fetch
         token = get_servicechannel_token()
         orders = get_work_orders(token)
         
         if not orders:
             return
 
-        # 2. Prep CSV in-memory
+        # Convert to CSV in-memory to avoid leaving local file traces
         df = pd.json_normalize(orders)
         csv_buffer = StringIO()
         df.to_csv(csv_buffer, index=False)
         csv_content = csv_buffer.getvalue()
 
-        # 3. Initialize Smartsheet
+        # Upload to Smartsheet as an attachment
         ss_client = smartsheet.Smartsheet(SS_TOKEN)
-        sheet_id = int(SS_SHEET_ID)
+        
+        # We name the file generically as discussed
         filename = "service_channel_orders.csv"
-
-        # 4. Search for an existing attachment by name
-        # Note: list_all_attachments is the most compatible method
-        attachments_result = ss_client.Attachments.list_all_attachments(sheet_id)
-        existing_attachment = next((a for a in attachments_result.data if a.name == filename), None)
-
-        print(f"Attachment found: {existing_attachment}")
-        if existing_attachment:
-            print(f"Parent type: {existing_attachment.parent_type}")
-
-        # 5. Execute versioned or fresh upload
-        file_tuple = (filename, csv_content.encode('utf-8'), 'text/csv')
-
-        if existing_attachment:
-            # Update the existing file
-            ss_client.Attachments.attach_new_version(
-                sheet_id,
-                existing_attachment.id,
-                file_tuple
-            )
-        else:
-            # Create the file for the first time
-            ss_client.Sheets.attach_to_sheet(
-                sheet_id,
-                file_tuple
-            )
+        
+        # Attachment logic
+        ss_client.Attachments.attach_file_to_sheet(
+            SS_SHEET_ID, 
+            (filename, csv_content, 'text/csv')
+        )
 
     except Exception as e:
         # Generic error to keep logs clean in a public repo
@@ -50,3 +76,6 @@ def main():
         #print(f"Error details: {e}")
         # Optional: raise e if you want the GitHub Action to show a 'red' fail status
         raise e
+
+if __name__ == "__main__":
+    main()
