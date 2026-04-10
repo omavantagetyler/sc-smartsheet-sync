@@ -2,7 +2,7 @@ name: Sync ServiceChannel to Smartsheet
 
 on:
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
