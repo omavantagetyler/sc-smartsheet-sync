@@ -64,15 +64,16 @@ def main():
         existing_attachment = next((a for a in attachments if a.name == filename), None)
 
         if existing_attachment:
-            # NEW VERSION: Use .Attachments
+            # UPLOAD AS NEW VERSION
             ss_client.Attachments.attach_new_version(
                 sheet_id,
                 existing_attachment.id,
                 (filename, csv_content, 'text/csv')
             )
         else:
-            # FIRST TIME: Use .Sheets
-            ss_client.Sheets.attach_file_to_sheet(
+            # FIRST TIME UPLOAD 
+            # Note: Using ss_client.Attachments.attach_to_sheet
+            ss_client.Attachments.attach_to_sheet(
                 sheet_id,
                 (filename, csv_content, 'text/csv')
             )
