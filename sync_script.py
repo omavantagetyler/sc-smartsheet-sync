@@ -25,7 +25,7 @@ def main():
 
         print(f"Attachment found: {existing_attachment}")
         if existing_attachment:
-        print(f"Parent type: {existing_attachment.parent_type}")
+            print(f"Parent type: {existing_attachment.parent_type}")
 
         # 5. Execute versioned or fresh upload
         file_tuple = (filename, csv_content.encode('utf-8'), 'text/csv')
