@@ -153,8 +153,8 @@ def main():
         print("=== SCRIPT COMPLETE ===")
 
     except Exception as e:
-        print("Automation failed.")
-        print(f"Error details: {e}")
+        #print("Automation failed.")
+        #print(f"Error details: {e}")
         raise e
 
 
