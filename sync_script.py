@@ -59,7 +59,7 @@ def main():
 
         # 4. Find existing attachment
         # We fetch the list of all attachments on the sheet
-        attachments_obj = ss_client.Attachments.list_attachments(sheet_id)
+        attachments_obj = ss_client.Attachments.list_all_attachments(sheet_id)
         attachments = attachments_obj.data
         
         # Check if our specific file already exists
