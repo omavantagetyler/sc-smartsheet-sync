@@ -26,6 +26,7 @@ jobs:
     - name: Run sync script
       env:
         # This pulls your keys from the "Secrets" vault into the script
+        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         SC_CLIENT_ID: ${{ secrets.SC_CLIENT_ID }}
         SC_CLIENT_SECRET: ${{ secrets.SC_CLIENT_SECRET }}
         SC_USERNAME: ${{ secrets.SC_USERNAME }}
