@@ -101,7 +101,7 @@ def main():
 
         # Filter to sheet-level only
         sheet_attachments = [
-            a for a in attachments if a.parent_type == 'sheet'
+            a for a in attachments if str(a.parent_type) == 'SHEET'
         ]
 
         print(f"Sheet-level attachments: {len(sheet_attachments)}")
