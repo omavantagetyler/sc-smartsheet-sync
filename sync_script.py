@@ -81,8 +81,10 @@ def main():
             )
 
     except Exception as e:
-        # Keeping logs clean for public repo
-        print(f"Error details: {e}")
+        # Generic error to keep logs clean in a public repo
+        print("Automation failed. Check API credentials or network status.")
+        #print(f"Error details: {e}")
+        # Optional: raise e if you want the GitHub Action to show a 'red' fail status
         raise e
 
 if __name__ == "__main__":
