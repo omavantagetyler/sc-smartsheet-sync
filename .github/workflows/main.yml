@@ -1,8 +1,9 @@
 name: Sync ServiceChannel to Smartsheet
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
+  # This allows external pings to trigger the workflow
+  repository_dispatch:
+    types: [trigger-sync]
   workflow_dispatch:
 
 jobs:
@@ -24,7 +25,6 @@ jobs:
 
     - name: Run sync script
       env:
-        # This pulls your keys from the "Secrets" vault into the script
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         SC_CLIENT_ID: ${{ secrets.SC_CLIENT_ID }}
         SC_CLIENT_SECRET: ${{ secrets.SC_CLIENT_SECRET }}
