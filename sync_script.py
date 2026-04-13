@@ -15,7 +15,6 @@ SS_SHEET_ID = int(os.getenv('SS_SHEET_ID'))
 
 FILENAME = "service_channel_orders.csv"
 
-
 def get_servicechannel_token():
     auth_url = "https://login.servicechannel.com/oauth/token"
     data = {
@@ -29,9 +28,10 @@ def get_servicechannel_token():
     response.raise_for_status()
     return response.json().get('access_token')
 
-
 def get_work_orders(token):
-    url = "https://api.servicechannel.com/v3/odata/workorders?$select=Id,Number,Status,Priority,Trade,Location,CallDate"
+    # REMOVED $select to get all top-level fields
+    # REMOVED specific $expand to avoid 400 errors; base V3 usually returns standard objects
+    url = "https://api.servicechannel.com/v3/workorders"
     headers = {'Authorization': f'Bearer {token}'}
 
     all_orders = []
@@ -41,16 +41,17 @@ def get_work_orders(token):
         resp.raise_for_status()
         data = resp.json()
 
-        all_orders.extend(data.get('value', []))
-        url = data.get('@odata.nextLink')
+        # Handle both OData 'value' wrapper and standard list response
+        batch = data.get('value', data) if isinstance(data, dict) else data
+        all_orders.extend(batch)
+        
+        # Pagination check
+        url = data.get('@odata.nextLink') if isinstance(data, dict) else None
 
     return all_orders
 
-
 def get_all_sheet_attachments(ss_client, sheet_id):
-    """Handles pagination and returns ALL attachments"""
     attachments = []
-
     result = ss_client.Attachments.list_all_attachments(sheet_id)
     attachments.extend(result.data)
 
@@ -60,15 +61,12 @@ def get_all_sheet_attachments(ss_client, sheet_id):
             page=result.page_number + 1
         )
         attachments.extend(result.data)
-
     return attachments
-
 
 def main():
     try:
         print("=== SCRIPT START ===")
 
-        # 1. Fetch data
         token = get_servicechannel_token()
         print("Token acquired")
 
@@ -79,14 +77,17 @@ def main():
             print("No orders found. Exiting.")
             return
 
-        # 2. Convert to CSV (in memory)
-        df = pd.json_normalize(orders)
+        # 2. FLATTEN EVERYTHING
+        # sep='_' turns nested JSON {"Location": {"Name": "X"}} into column "Location_Name"
+        df = pd.json_normalize(orders, sep='_')
+
+        # CLEANUP: Smartsheet safety (4000 char limit per cell)
+        for col in df.select_dtypes(include=['object']):
+            df[col] = df[col].astype(str).str.slice(0, 3950)
 
         csv_buffer = StringIO()
         df.to_csv(csv_buffer, index=False)
         csv_content = csv_buffer.getvalue()
-
-        # Convert to BytesIO (critical for versioning)
         csv_bytes = BytesIO(csv_content.encode('utf-8'))
 
         # 3. Initialize Smartsheet
@@ -94,69 +95,32 @@ def main():
         sheet_id = SS_SHEET_ID
 
         print("Fetching existing attachments...")
-
         attachments = get_all_sheet_attachments(ss_client, sheet_id)
 
-        print(f"Total attachments found: {len(attachments)}")
-
-        # Filter to sheet-level only
-        sheet_attachments = [
-            a for a in attachments if str(a.parent_type) == 'SHEET'
-        ]
-
-        print(f"Sheet-level attachments: {len(sheet_attachments)}")
-
-        # Find matching file
-        existing_attachment = next(
-            (a for a in sheet_attachments if a.name == FILENAME),
-            None
-        )
-
-        print(f"Matching attachment: {existing_attachment}")
+        sheet_attachments = [a for a in attachments if str(a.parent_type) == 'SHEET']
+        existing_attachment = next((a for a in sheet_attachments if a.name == FILENAME), None)
 
         file_tuple = (FILENAME, csv_bytes, 'text/csv')
 
         # 4. Upload logic
         if existing_attachment:
-            print("=== ATTEMPTING VERSION UPLOAD ===")
-            print(f"Attachment ID: {existing_attachment.id}")
-
+            print(f"=== UPDATING EXISTING FILE (ID: {existing_attachment.id}) ===")
             try:
-                response = ss_client.Attachments.attach_new_version(
-                    sheet_id,
-                    existing_attachment.id,
-                    file_tuple
-                )
+                ss_client.Attachments.attach_new_version(sheet_id, existing_attachment.id, file_tuple)
                 print("Version upload SUCCESS")
-                print(response)
-
             except Exception as e:
-                print("Version upload FAILED, falling back to new upload")
-                print(e)
-
-                ss_client.Attachments.attach_file_to_sheet(
-                    sheet_id,
-                    file_tuple
-                )
-                print("Fallback upload SUCCESS")
-
+                print(f"Version upload FAILED: {e}\nFalling back to new upload...")
+                ss_client.Attachments.attach_file_to_sheet(sheet_id, file_tuple)
         else:
-            print("=== NO EXISTING FILE, CREATING NEW ===")
-
-            ss_client.Attachments.attach_file_to_sheet(
-                sheet_id,
-                file_tuple
-            )
-
-            print("Initial upload SUCCESS (Version 1 created)")
+            print("=== CREATING NEW ATTACHMENT ===")
+            ss_client.Attachments.attach_file_to_sheet(sheet_id, file_tuple)
+            print("Initial upload SUCCESS")
 
         print("=== SCRIPT COMPLETE ===")
 
     except Exception as e:
-        #print("Automation failed.")
-        #print(f"Error details: {e}")
+        print(f"Automation failed: {e}")
         raise e
-
 
 if __name__ == "__main__":
     main()
